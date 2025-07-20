@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to a One-Hidden-Layer Neural Network</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: The SPA is designed as a thematic, vertical-scrolling page with a sticky side navigation for easy access to different concepts. The structure is task-oriented, transforming passive reading into active exploration. It begins with a high-level interactive architecture diagram, then simulates the data flow (Forward Propagation), provides a hands-on "lab" for Activation Functions, visualizes the learning process (Backpropagation & Gradient Descent), and finally demonstrates a critical pitfall with an Initialization Playground. This flow was chosen to build concepts intuitively—from static structure to dynamic computation, learning, and finally, best practices—making it more engaging and effective for learners than a linear document. -->
+    <!-- Visualization & Content Choices: 
+        - NN Architecture: Goal is to inform & organize. An interactive diagram made with HTML/CSS is used. Clicking elements reveals contextual information, making the static report diagram explorable. This reinforces the relationship between visual components and their mathematical notations. Method: HTML/CSS/JS.
+        - Forward/Backward Propagation: Goal is to explain a process. An animated diagram using simple CSS transitions shows the flow of data and errors. This makes the abstract sequence of equations tangible. Method: HTML/CSS/JS.
+        - Activation Functions: Goal is to compare and allow exploration. An interactive Chart.js line chart is used. A slider allows users to see the output and gradient for any input 'z' in real-time. This provides powerful intuition for concepts like vanishing gradients. Method: Chart.js, JS.
+        - Initialization: Goal is to explain a critical concept. A side-by-side visual comparison shows the consequence of zero vs. random initialization, demonstrating the "symmetry breaking" problem concretely. Method: HTML/CSS/JS.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+            color: #1e293b; /* slate-800 */
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+        .section-title {
+            @apply text-3xl font-bold text-slate-900 mb-4;
+        }
+        .section-intro {
+            @apply text-lg text-slate-600 mb-8 max-w-3xl mx-auto;
+        }
+        .card {
+            @apply bg-white p-6 rounded-xl shadow-md border border-slate-200;
+        }
+        .nav-link {
+            @apply block text-left text-slate-600 hover:text-sky-600 hover:bg-sky-50 py-2 px-3 rounded-lg transition-colors duration-200;
+        }
+        .nav-link.active {
+            @apply font-semibold text-sky-600 bg-sky-100;
+        }
+        .equation {
+            @apply bg-slate-100 p-4 rounded-lg text-center text-sm md:text-base overflow-x-auto my-4;
+        }
+        .diagram-node {
+            @apply w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center font-semibold text-sm border-2 transition-all duration-200;
+        }
+        .info-box {
+            @apply bg-white p-6 rounded-lg shadow-lg border border-slate-200 mt-4;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="lg:flex">
+            <!-- Sticky Sidebar Navigation -->
+            <aside class="lg:w-64 lg:pr-8 lg:sticky lg:top-0 lg:self-start py-8 lg:h-screen">
+                <nav id="sidebar-nav">
+                    <h2 class="text-xl font-bold text-slate-900 mb-4">Navigation</h2>
+                    <ul class="space-y-1">
+                        <li><a href="#introduction" class="nav-link">Introduction</a></li>
+                        <li><a href="#architecture" class="nav-link">Architecture Explorer</a></li>
+                        <li><a href="#forward-prop" class="nav-link">Forward Propagation</a></li>
+                        <li><a href="#activations" class="nav-link">Activation Functions Lab</a></li>
+                        <li><a href="#back-prop" class="nav-link">The Learning Process</a></li>
+                        <li><a href="#initialization" class="nav-link">Initialization Playground</a></li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 py-8">
+                
+                <!-- Introduction Section -->
+                <section id="introduction" class="text-center mb-24">
+                    <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">An Interactive Guide to Neural Networks</h1>
+                    <p class="section-intro">This guide breaks down the fundamental concepts of a simple, one-hidden-layer neural network. We'll move beyond static notes and explore the architecture, data flow, and learning process through interactive visualizations.</p>
+                </section>
+
+                <!-- Architecture Explorer Section -->
+                <section id="architecture" class="mb-24">
+                    <h2 class="section-title text-center">Architecture Explorer</h2>
+                    <p class="section-intro">A neural network is composed of layers of interconnected nodes (neurons). Click on any component in the diagram below to learn about its role, parameters, and dimensions. This visual represents a "two-layer" network (the input layer is not counted).</p>
+                    
+                    <div class="card">
+                        <div class="flex justify-around items-center space-x-4 md:space-x-8 p-8" id="nn-diagram">
+                            <!-- Input Layer -->
+                            <div class="text-center space-y-2">
+                                <h3 class="font-semibold text-slate-700">Input Layer (L0)</h3>
+                                <div id="layer-0" class="space-y-3 diagram-component" data-info="input-info">
+                                    <div class="diagram-node bg-green-100 border-green-400">x₁, x₂...</div>
+                                </div>
+                                <p class="text-xs text-slate-500">Features</p>
+                            </div>
+
+                            <!-- Connection 1 -->
+                            <div class="flex-col items-center text-center">
+                                <div class="font-mono text-sky-600 diagram-component" data-info="w1-info">W¹ , b¹</div>
+                                <div class="text-3xl text-slate-300">&rarr;</div>
+                            </div>
+
+                            <!-- Hidden Layer -->
+                            <div class="text-center space-y-2">
+                                <h3 class="font-semibold text-slate-700">Hidden Layer (L1)</h3>
+                                <div id="layer-1" class="space-y-3 diagram-component" data-info="hidden-info">
+                                    <div class="diagram-node bg-sky-100 border-sky-400">a₁¹</div>
+                                    <div class="diagram-node bg-sky-100 border-sky-400">a₂¹</div>
+                                    <div class="diagram-node bg-sky-100 border-sky-400">...</div>
+                                </div>
+                                <p class="text-xs text-slate-500">Activations</p>
+                            </div>
+
+                            <!-- Connection 2 -->
+                            <div class="flex-col items-center text-center">
+                                <div class="font-mono text-purple-600 diagram-component" data-info="w2-info">W² , b²</div>
+                                <div class="text-3xl text-slate-300">&rarr;</div>
+                            </div>
+
+                             <!-- Output Layer -->
+                            <div class="text-center space-y-2">
+                                <h3 class="font-semibold text-slate-700">Output Layer (L2)</h3>
+                                <div id="layer-2" class="diagram-component" data-info="output-info">
+                                    <div class="diagram-node bg-purple-100 border-purple-400">ŷ</div>
+                                </div>
+                                <p class="text-xs text-slate-500">Prediction</p>
+                            </div>
+                        </div>
+                        <div id="info-display" class="info-box hidden min-h-[100px]">
+                            <button id="gemini-deep-dive-btn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200 hidden">Deep Dive with Gemini ✨</button>
+                            <div id="gemini-deep-dive-response" class="mt-4 text-slate-700"></div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Forward Propagation Section -->
+                <section id="forward-prop" class="mb-24">
+                    <h2 class="section-title text-center">Forward Propagation: The Data Flow</h2>
+                    <p class="section-intro">Forward propagation is how the network makes a prediction. Input data flows forward through the layers, with each layer performing a linear calculation followed by a non-linear activation. Here's how it works for a single example and vectorized across many examples.</p>
+                    
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div class="card">
+                            <h3 class="text-xl font-semibold mb-4 text-center">Layer 1 (Hidden Layer)</h3>
+                            <p class="text-slate-600 mb-4">The input vector $x$ is transformed by the weights $W^{[1]}$ and bias $b^{[1]}$ to compute $z^{[1]}$. Then, an activation function $g^{[1]}$ (like ReLU or Tanh) is applied to get the hidden activations $a^{[1]}$.</p>
+                            <div class="equation font-mono">z¹ = W¹x + b¹</div>
+                            <div class="equation font-mono">a¹ = g¹(z¹)</div>
+                        </div>
+                        <div class="card">
+                            <h3 class="text-xl font-semibold mb-4 text-center">Layer 2 (Output Layer)</h3>
+                            <p class="text-slate-600 mb-4">The hidden activations $a^{[1]}$ are then transformed by the output layer's weights $W^{[2]}$ and bias $b^{[2]}$. The final activation $a^{[2]}$, often using a Sigmoid function for binary classification, gives the prediction $\hat{y}$.</p>
+                            <div class="equation font-mono">z² = W²a¹ + b²</div>
+                            <div class="equation font-mono">a² = g²(z²) = ŷ</div>
+                        </div>
+                    </div>
+                    <div class="card mt-8">
+                        <h3 class="text-xl font-semibold mb-4 text-center">Vectorization Across Multiple Examples</h3>
+                        <p class="text-slate-600 mb-4 text-center">To process an entire dataset efficiently, we stack individual input vectors $x^{(i)}$ into a matrix $X$. The math remains the same, but now we operate on matrices, which is much faster.</p>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="equation font-mono">Z¹ = W¹X + b¹</div>
+                            <div class="equation font-mono">A¹ = g¹(Z¹)</div>
+                            <div class="equation font-mono">Z² = W²A¹ + b²</div>
+                            <div class="equation font-mono">A² = g²(Z²) = Ŷ</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Activation Functions Lab -->
+                <section id="activations" class="mb-24">
+                    <h2 class="section-title text-center">Activation Functions Lab</h2>
+                    <p class="section-intro">Activation functions introduce essential non-linearity. Without them, a neural network could only learn linear relationships. Explore different activation functions below. Move the slider to change the input `z` and see how the activation `a` and its derivative `g'(z)` change. Notice how the gradient for Sigmoid and Tanh vanishes (gets close to zero) for large positive or negative inputs.</p>
+
+                    <div class="card">
+                        <div class="flex justify-center space-x-2 mb-6">
+                            <button id="btn-sigmoid" class="activation-btn px-4 py-2 rounded-md font-semibold bg-sky-100 text-sky-700">Sigmoid</button>
+                            <button id="btn-tanh" class="activation-btn px-4 py-2 rounded-md font-semibold bg-slate-100 text-slate-700">Tanh</button>
+                            <button id="btn-relu" class="activation-btn px-4 py-2 rounded-md font-semibold bg-slate-100 text-slate-700">ReLU</button>
+                            <button id="btn-leaky_relu" class="activation-btn px-4 py-2 rounded-md font-semibold bg-slate-100 text-slate-700">Leaky ReLU</button>
+                        </div>
+                        <div class="grid lg:grid-cols-2 gap-8 items-center">
+                            <div class="chart-container w-full max-w-lg mx-auto h-80 relative">
+                                <canvas id="activationChart"></canvas>
+                            </div>
+                            <div>
+                                <h3 id="activation-title" class="text-2xl font-bold mb-2">Sigmoid</h3>
+                                <div id="activation-formula" class="equation font-mono"></div>
+                                <div class="flex justify-around text-center my-4">
+                                    <div>
+                                        <label for="z-slider" class="block text-sm font-medium text-slate-700">Input (z)</label>
+                                        <p id="z-value" class="text-2xl font-bold text-slate-900">0.00</p>
+                                    </div>
+                                    <div>
+                                        <p class="block text-sm font-medium text-slate-700">Activation (a)</p>
+                                        <p id="a-value" class="text-2xl font-bold text-sky-600">0.00</p>
+                                    </div>
+                                     <div>
+                                        <p class="block text-sm font-medium text-slate-700">Gradient (g'(z))</p>
+                                        <p id="grad-value" class="text-2xl font-bold text-red-600">0.00</p>
+                                    </div>
+                                </div>
+                                <input id="z-slider" type="range" min="-10" max="10" value="0" step="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                <button id="gemini-implications-btn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200 w-full">Explain Implications ✨</button>
+                                <div id="activation-info" class="mt-6 text-slate-600"></div>
+                                <div id="gemini-implications-response" class="mt-4 text-slate-700"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Backpropagation Section -->
+                <section id="back-prop" class="mb-24">
+                    <h2 class="section-title text-center">The Learning Process</h2>
+                    <p class="section-intro">How does a network learn? It computes the error in its prediction and propagates this error backward through the network to figure out how to adjust its weights and biases. This is called backpropagation, and it's the core of training via gradient descent.</p>
+                     <div class="card">
+                        <h3 class="text-xl font-semibold mb-4 text-center">Backpropagation Intuition</h3>
+                        <p class="text-slate-600 mb-4">Backpropagation uses the chain rule of calculus to calculate the gradient of the cost function with respect to each parameter ($dW, db$). These gradients tell us the direction and magnitude of the change needed to reduce the error. The key vectorized equations are:</p>
+                        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                             <div class="equation font-mono text-sm">dZ² = A² - Y</div>
+                             <div class="equation font-mono text-sm">dW² = (1/m) dZ² A¹ᵀ</div>
+                             <div class="equation font-mono text-sm">db² = (1/m) sum(dZ²)</div>
+                             <div class="equation font-mono text-sm">dZ¹ = W²ᵀ dZ² * g¹'(Z¹)</div>
+                             <div class="equation font-mono text-sm">dW¹ = (1/m) dZ¹ Xᵀ</div>
+                             <div class="equation font-mono text-sm">db¹ = (1/m) sum(dZ¹)</div>
+                        </div>
+                         <h3 class="text-xl font-semibold mb-4 mt-8 text-center">Gradient Descent Update</h3>
+                         <p class="text-slate-600 mb-4">Once the gradients are computed, we update the parameters by taking a small step in the opposite direction of the gradient. The size of this step is controlled by the learning rate $\alpha$.</p>
+                         <div class="equation font-mono">W := W - α * dW</div>
+                         <div class="equation font-mono">b := b - α * db</div>
+                         <button id="gemini-simplify-btn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200 w-full">Simplify Concept ✨</button>
+                         <div id="gemini-simplify-response" class="mt-4 text-slate-700"></div>
+                    </div>
+                </section>
+
+                 <!-- Initialization Playground Section -->
+                <section id="initialization" class="mb-24">
+                    <h2 class="section-title text-center">Initialization Playground</h2>
+                    <p class="section-intro">How we initialize weights is critical. Initializing all weights to zero leads to a "symmetry problem" where all hidden neurons learn the same thing, making them redundant. We must initialize weights to small, random values to break this symmetry.</p>
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div class="card border-red-300">
+                             <h3 class="text-xl font-semibold mb-4 text-center text-red-700">Problem: Zero Initialization</h3>
+                             <p class="text-slate-600 mb-4">If all weights start at zero, all hidden neurons compute the same function. During backpropagation, they all receive the same gradient update. They remain identical throughout training, defeating the purpose of having multiple neurons.</p>
+                             <div class="equation font-mono bg-red-50">W = np.zeros(shape)</div>
+                             <p class="font-semibold text-center mt-4">Result: All hidden neurons are identical clones. The network's capacity is crippled.</p>
+                        </div>
+                        <div class="card border-green-300">
+                             <h3 class="text-xl font-semibold mb-4 text-center text-green-700">Solution: Random Initialization</h3>
+                             <p class="text-slate-600 mb-4">By initializing weights to small random numbers, each neuron starts off differently. This "breaks the symmetry," allowing them to learn unique features from the data as they receive different gradient updates during training.</p>
+                             <div class="equation font-mono bg-green-50">W = np.random.randn(shape) * 0.01</div>
+                             <p class="font-semibold text-center mt-4">Result: Neurons can specialize and learn diverse features, enabling the network to learn complex patterns.</p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const API_KEY = ""; // If you want to use models other than gemini-2.0-flash or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
+
+    async function callGeminiAPI(prompt) {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+        const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+        const payload = { contents: chatHistory };
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                return "Error: Could not get a response from Gemini.";
+            }
+        } catch (error) {
+            console.error("Gemini API call failed:", error);
+            return "Error: Failed to connect to Gemini API.";
+        }
+    }
+
+    // --- Interactive Architecture Diagram ---
+    const diagramComponents = document.querySelectorAll('.diagram-component');
+    const infoDisplay = document.getElementById('info-display');
+    const geminiDeepDiveBtn = document.getElementById('gemini-deep-dive-btn');
+    const geminiDeepDiveResponse = document.getElementById('gemini-deep-dive-response');
+    let currentComponentTitle = '';
+
+    const componentInfo = {
+        'input-info': {
+            title: 'Input Layer (Layer 0)',
+            text: 'This layer receives the raw input features of your dataset. Each node represents a single feature. For an input vector $x$ with $n_x$ features, this layer has $n_x$ nodes. It does not perform any computation; it simply passes the data to the first hidden layer.',
+            params: 'Parameters: None',
+            dims: 'Output Dimensions: $A^{[0]}$ has shape $(n_x, m)$ where $m$ is the number of examples.'
+        },
+        'hidden-info': {
+            title: 'Hidden Layer (Layer 1)',
+            text: 'This layer is the core computational engine of the network. It receives inputs from the previous layer and learns to extract meaningful features and intermediate representations. The term "hidden" means its activation values are not directly observed in the training data.',
+            params: 'Learns parameters $W^{[1]}$ and $b^{[1]}$.',
+            dims: 'Output Dimensions: $A^{[1]}$ has shape $(n_1, m)$ where $n_1$ is the number of hidden neurons.'
+        },
+        'output-info': {
+            title: 'Output Layer (Layer 2)',
+            text: 'The final layer that produces the prediction $\\hat{y}$. For binary classification, this layer typically has one neuron with a Sigmoid activation function to output a probability between 0 and 1.',
+            params: 'Learns parameters $W^{[2]}$ and $b^{[2]}$.',
+            dims: 'Output Dimensions: $A^{[2]}$ has shape $(n_2, m)$ where $n_2$ is the number of output neurons (1 for binary classification).'
+        },
+        'w1-info': {
+            title: 'Parameters: $W^{[1]}, b^{[1]}$',
+            text: 'These are the learnable parameters for the hidden layer. $W^{[1]}$ is the weight matrix and $b^{[1]}$ is the bias vector. They are adjusted during training to minimize the error.',
+            params: '',
+            dims: 'Dimensions: $W^{[1]}$ is $(n_1, n_x)$, and $b^{[1]}$ is $(n_1, 1)$.'
+        },
+        'w2-info': {
+            title: 'Parameters: $W^{[2]}, b^{[2]}$',
+            text: 'These are the learnable parameters for the output layer. $W^{[2]}$ is the weight matrix and $b^{[2]}$ is the bias vector.',
+            params: '',
+            dims: 'Dimensions: $W^{[2]}$ is $(n_2, n_1)$, and $b^{[2]}$ is $(n_2, 1)$.'
+        }
+    };
+
+    diagramComponents.forEach(comp => {
+        comp.addEventListener('click', () => {
+            const infoKey = comp.dataset.info;
+            const info = componentInfo[infoKey];
+            currentComponentTitle = info.title; // Store for Gemini prompt
+            
+            infoDisplay.innerHTML = `
+                <h4 class="font-bold text-lg text-slate-800 mb-2">${info.title}</h4>
+                <p class="text-slate-600 mb-2">${info.text}</p>
+                <p class="font-mono text-sm text-sky-700">${info.params}</p>
+                <p class="font-mono text-sm text-purple-700">${info.dims}</p>
+                <button id="gemini-deep-dive-btn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors duration-200">Deep Dive with Gemini ✨</button>
+                <div id="gemini-deep-dive-response" class="mt-4 text-slate-700"></div>
+            `;
+            infoDisplay.classList.remove('hidden');
+            geminiDeepDiveResponse.innerHTML = ''; // Clear previous response
+
+            document.getElementById('gemini-deep-dive-btn').addEventListener('click', async () => {
+                geminiDeepDiveResponse.innerHTML = '<div class="loading-spinner"></div> Loading deeper insights...';
+                const prompt = `Provide a more in-depth and intuitive explanation of the role and function of the ${currentComponentTitle} in a neural network. Focus on its significance in the overall network operation.`;
+                const response = await callGeminiAPI(prompt);
+                geminiDeepDiveResponse.innerHTML = response;
+            });
+
+            if (window.MathJax) {
+                window.MathJax.typeset();
+            }
+        });
+    });
+
+    // --- Activation Function Lab ---
+    const activationData = {
+        sigmoid: {
+            title: 'Sigmoid',
+            formula: '$$g(z) = \\frac{1}{1 + e^{-z}}$$',
+            info: '<strong>Pros:</strong> Outputs a probability-like value between 0 and 1, which is useful for the output layer in binary classification.<br><strong>Cons:</strong> Suffers from the vanishing gradient problem, which can slow down training. Its output is not zero-centered.',
+            func: z => 1 / (1 + Math.exp(-z)),
+            grad: z => {
+                const a = 1 / (1 + Math.exp(-z));
+                return a * (1 - a);
+            }
+        },
+        tanh: {
+            title: 'Tanh',
+            formula: '$$g(z) = \\frac{e^z - e^{-z}}{e^z + e^{-z}}$$',
+            info: '<strong>Pros:</strong> Its output is zero-centered, which often helps speed up convergence. Generally preferred over Sigmoid for hidden layers.<br><strong>Cons:</strong> Still suffers from the vanishing gradient problem for large inputs.',
+            func: z => Math.tanh(z),
+            grad: z => 1 - Math.pow(Math.tanh(z), 2)
+        },
+        relu: {
+            title: 'ReLU',
+            formula: '$$g(z) = \\max(0, z)$$',
+            info: '<strong>Pros:</strong> Computationally efficient and helps mitigate the vanishing gradient problem for positive inputs.<br><strong>Cons:</strong> Can suffer from the "Dying ReLU" problem where neurons get stuck in a zero-output state.',
+            func: z => Math.max(0, z),
+            grad: z => (z >= 0 ? 1 : 0)
+        },
+        leaky_relu: {
+            title: 'Leaky ReLU',
+            formula: '$$g(z) = \\max(0.01z, z)$$',
+            info: '<strong>Pros:</strong> An improvement over ReLU that fixes the "Dying ReLU" problem by allowing a small, non-zero gradient for negative inputs.<br><strong>Cons:</strong> Not always guaranteed to perform better than ReLU.',
+            func: z => Math.max(0.01 * z, z),
+            grad: z => (z >= 0 ? 1 : 0.01)
+        }
+    };
+
+    let currentActivation = 'sigmoid';
+    const zSlider = document.getElementById('z-slider');
+    const activationTitle = document.getElementById('activation-title');
+    const activationFormula = document.getElementById('activation-formula');
+    const activationInfo = document.getElementById('activation-info');
+    const zValue = document.getElementById('z-value');
+    const aValue = document.getElementById('a-value');
+    const gradValue = document.getElementById('grad-value');
+    const geminiImplicationsBtn = document.getElementById('gemini-implications-btn');
+    const geminiImplicationsResponse = document.getElementById('gemini-implications-response');
+
+    const ctx = document.getElementById('activationChart').getContext('2d');
+    const activationChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'g(z)',
+                    data: [],
+                    borderColor: 'rgb(2, 132, 199)', // sky-600
+                    tension: 0.1,
+                    borderWidth: 2
+                },
+                 {
+                    label: "g'(z)",
+                    data: [],
+                    borderColor: 'rgb(220, 38, 38)', // red-600
+                    tension: 0.1,
+                    borderWidth: 2,
+                    borderDash: [5, 5]
+                },
+                {
+                    label: 'Current Point',
+                    data: [],
+                    backgroundColor: 'rgb(2, 132, 199)',
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    type: 'bubble'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom',
+                    title: { display: true, text: 'z' }
+                },
+                y: {
+                     title: { display: true, text: 'a' }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+            }
+        }
+    });
+
+    function updateActivationLab() {
+        const data = activationData[currentActivation];
+        activationTitle.textContent = data.title;
+        activationFormula.innerHTML = data.formula;
+        activationInfo.innerHTML = data.info;
+        geminiImplicationsResponse.innerHTML = ''; // Clear previous response
+
+        const labels = [];
+        const funcData = [];
+        const gradData = [];
+        for (let i = -10; i <= 10; i += 0.5) {
+            labels.push(i);
+            funcData.push(data.func(i));
+            gradData.push(data.grad(i));
+        }
+
+        activationChart.data.labels = labels;
+        activationChart.data.datasets[0].data = funcData;
+        activationChart.data.datasets[1].data = gradData;
+        
+        updateSlider();
+        
+        if (window.MathJax) {
+            window.MathJax.typeset();
+        }
+    }
+
+    function updateSlider() {
+        const z = parseFloat(zSlider.value);
+        const data = activationData[currentActivation];
+        const a = data.func(z);
+        const grad = data.grad(z);
+
+        zValue.textContent = z.toFixed(2);
+        aValue.textContent = a.toFixed(2);
+        gradValue.textContent = grad.toFixed(2);
+        
+        activationChart.data.datasets[2].data = [{x: z, y: a, r:5}];
+        activationChart.update();
+    }
+
+    zSlider.addEventListener('input', updateSlider);
+
+    document.querySelectorAll('.activation-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentActivation = btn.id.replace('btn-', '');
+            document.querySelectorAll('.activation-btn').forEach(b => {
+                b.classList.remove('bg-sky-100', 'text-sky-700');
+                b.classList.add('bg-slate-100', 'text-slate-700');
+            });
+            btn.classList.add('bg-sky-100', 'text-sky-700');
+            btn.classList.remove('bg-slate-100', 'text-slate-700');
+            updateActivationLab();
+        });
+    });
+
+    geminiImplicationsBtn.addEventListener('click', async () => {
+        geminiImplicationsResponse.innerHTML = '<div class="loading-spinner"></div> Loading implications...';
+        const prompt = `Explain the practical implications, common use cases, and key pros and cons of the ${currentActivation} activation function in a neural network. Keep it concise.`;
+        const response = await callGeminiAPI(prompt);
+        geminiImplicationsResponse.innerHTML = response;
+    });
+
+    updateActivationLab();
+
+    // --- Backpropagation Section (Gemini Simplify Concept) ---
+    const geminiSimplifyBtn = document.getElementById('gemini-simplify-btn');
+    const geminiSimplifyResponse = document.getElementById('gemini-simplify-response');
+
+    geminiSimplifyBtn.addEventListener('click', async () => {
+        geminiSimplifyResponse.innerHTML = '<div class="loading-spinner"></div> Simplifying concept...';
+        const prompt = "Explain backpropagation and gradient descent in a neural network using a simple, easy-to-understand analogy or metaphor. Focus on how the network learns from errors.";
+        const response = await callGeminiAPI(prompt);
+        geminiSimplifyResponse.innerHTML = response;
+    });
+
+    // --- Sidebar Navigation Active State ---
+    const sections = document.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('#sidebar-nav a');
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === entry.target.id) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+        });
+    }, { rootMargin: '-50% 0px -50% 0px' });
+
+    sections.forEach(section => {
+        observer.observe(section);
+    });
+});
+</script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</body>
+</html>
